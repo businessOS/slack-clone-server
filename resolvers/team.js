@@ -9,19 +9,26 @@ export default {
   Mutation: {
     addTeamMember: requiresAuth.createResolver(async (parent, { email, teamId }, { models, user }) => {
       try {
-        const teamPromise = models.team.findOne({ where: { id: teamId } }, { raw: true });
-        const userToAddPromise = models.user.findOne({ where: { email } }, { raw: true });
+        const teamPromise = models.Team.findOne({ where: { id: teamId } }, { raw: true });
+        const userToAddPromise = models.User.findOne({ where: { email } }, { raw: true });
         const [team, userToAdd] = await Promise.all([teamPromise, userToAddPromise]);
+        
         if (team.owner !== user.id) {
           return {
             ok: false,
-            errors: [{ path: 'email', msg: 'Ud no puede agregar miembros al equipo' }],
+            errors: [{ path: 'email', message: 'Ud no puede agregar usuarios a este equipo' }],
+          };
+        }
+        if (team.owner === userToAdd.id) {
+          return {
+            ok: false,
+            errors: [{ path: 'email', message: 'Ud no puede agregarse a si mismo al equipo' }],
           };
         }
         if (!userToAdd) {
           return {
             ok: false,
-            errors: [{ path: 'email', msg: 'No existe un usuario con este email' }],
+            errors: [{ path: 'email', message: 'No pudimos encontrar usuario con este email' }],
           };
         }
         await models.Member.create({ userId: userToAdd.id, teamId });
@@ -29,6 +36,7 @@ export default {
           ok: true,
         };
       } catch (err) {
+        console.log(err);
         return {
           ok: false,
           errors: formatErrors(err),
@@ -44,7 +52,6 @@ export default {
           team,
         };
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.log(err);
         return {
           ok: false,
