@@ -7,6 +7,34 @@ export default {
       models.Team.findAll({ where: { owner: user.id } }, { raw: true })),
   },
   Mutation: {
+    addTeamMember: requiresAuth.createResolver(async (parent, { email, teamId }, { models, user }) => {
+      try {
+        const teamPromise = models.team.findOne({ where: { id: teamId } }, { raw: true });
+        const userToAddPromise = models.user.findOne({ where: { email } }, { raw: true });
+        const [team, userToAdd] = await Promise.all([teamPromise, userToAddPromise]);
+        if (team.owner !== user.id) {
+          return {
+            ok: false,
+            errors: [{ path: 'email', msg: 'Ud no puede agregar miembros al equipo' }],
+          };
+        }
+        if (!userToAdd) {
+          return {
+            ok: false,
+            errors: [{ path: 'email', msg: 'No existe un usuario con este email' }],
+          };
+        }
+        await models.Member.create({ userId: userToAdd.id, teamId });
+        return {
+          ok: true,
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          errors: formatErrors(err),
+        };
+      }
+    }),
     createTeam: requiresAuth.createResolver(async (parent, args, { models, user }) => {
       try {
         const team = await models.Team.create({ ...args, owner: user.id });
