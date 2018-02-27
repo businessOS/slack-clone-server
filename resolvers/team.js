@@ -6,17 +6,22 @@ export default {
     allTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
       models.Team.findAll({ where: { owner: user.id } }, { raw: true })),
     inviteTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
-      models.Team.findAll(
-        {
-          include: [
-            {
-              model: models.User,
-              where: { id: user.id },
-            },
-          ],
-        },
-        { raw: true },
-      )),
+      models.sequelize.query('select * from teams join members on id = team_id where user_id = ?', {
+        replacements: [user.id],
+        model: models.Team,
+      })),
+    // inviteTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
+    //   models.Team.findAll(
+    //     {
+    //       include: [
+    //         {
+    //           model: models.User,
+    //           where: { id: user.id },
+    //         },
+    //       ],
+    //     },
+    //     { raw: true },
+    //   )),
   },
   Mutation: {
     addTeamMember: requiresAuth.createResolver(async (parent, { email, teamId }, { models, user }) => {
@@ -27,13 +32,13 @@ export default {
         if (team.owner !== user.id) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'You cannot add members to the team' }],
+            errors: [{ path: 'email', message: 'Ud no puede agregar miembros a este equipo' }],
           };
         }
         if (!userToAdd) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'Could not find user with this email' }],
+            errors: [{ path: 'email', message: 'No se pudo encontrar usuarios con este email' }],
           };
         }
         await models.Member.create({ userId: userToAdd.id, teamId });
