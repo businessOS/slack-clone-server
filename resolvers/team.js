@@ -5,6 +5,18 @@ export default {
   Query: {
     allTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
       models.Team.findAll({ where: { owner: user.id } }, { raw: true })),
+    inviteTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
+      models.Team.findAll(
+        {
+          include: [
+            {
+              model: models.User,
+              where: { id: user.id },
+            },
+          ],
+        },
+        { raw: true },
+      )),
   },
   Mutation: {
     addTeamMember: requiresAuth.createResolver(async (parent, { email, teamId }, { models, user }) => {
@@ -15,19 +27,13 @@ export default {
         if (team.owner !== user.id) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'Ud no puede agregar miembros a este equipo' }],
+            errors: [{ path: 'email', message: 'You cannot add members to the team' }],
           };
         }
         if (!userToAdd) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'No podemos hallar usuarios con este email' }],
-          };
-        }
-        if (userToAdd.id === user.id) {
-          return {
-            ok: false,
-            errors: [{ path: 'email', message: 'Esta persona no puede ser agregado a su propio equipo' }],
+            errors: [{ path: 'email', message: 'Could not find user with this email' }],
           };
         }
         await models.Member.create({ userId: userToAdd.id, teamId });
@@ -35,6 +41,7 @@ export default {
           ok: true,
         };
       } catch (err) {
+        console.log(err);
         return {
           ok: false,
           errors: formatErrors(err, models),
@@ -53,6 +60,7 @@ export default {
           team: response,
         };
       } catch (err) {
+        console.log(err);
         return {
           ok: false,
           errors: formatErrors(err, models),
