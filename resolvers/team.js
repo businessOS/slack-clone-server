@@ -12,23 +12,22 @@ export default {
         const teamPromise = models.Team.findOne({ where: { id: teamId } }, { raw: true });
         const userToAddPromise = models.User.findOne({ where: { email } }, { raw: true });
         const [team, userToAdd] = await Promise.all([teamPromise, userToAddPromise]);
-        
         if (team.owner !== user.id) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'Ud no puede agregar usuarios a este equipo' }],
-          };
-        }
-        if (team.owner === userToAdd.id) {
-          return {
-            ok: false,
-            errors: [{ path: 'email', message: 'Ud no puede agregarse a si mismo al equipo' }],
+            errors: [{ path: 'email', message: 'Ud no puede agregar miembros a este equipo' }],
           };
         }
         if (!userToAdd) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'No pudimos encontrar usuario con este email' }],
+            errors: [{ path: 'email', message: 'No podemos hallar usuarios con este email' }],
+          };
+        }
+        if (userToAdd.id === user.id) {
+          return {
+            ok: false,
+            errors: [{ path: 'email', message: 'Esta persona no puede ser agregado a su propio equipo' }],
           };
         }
         await models.Member.create({ userId: userToAdd.id, teamId });
@@ -36,26 +35,27 @@ export default {
           ok: true,
         };
       } catch (err) {
-        console.log(err);
         return {
           ok: false,
-          errors: formatErrors(err),
+          errors: formatErrors(err, models),
         };
       }
     }),
     createTeam: requiresAuth.createResolver(async (parent, args, { models, user }) => {
       try {
-        const team = await models.Team.create({ ...args, owner: user.id });
-        await models.Channel.create({ name: 'general', public: true, teamId: team.id });
+        const response = await models.sequelize.transaction(async () => {
+          const team = await models.Team.create({ ...args, owner: user.id });
+          await models.Channel.create({ name: 'general', public: true, teamId: team.id });
+          return team;
+        });
         return {
           ok: true,
-          team,
+          team: response,
         };
       } catch (err) {
-        console.log(err);
         return {
           ok: false,
-          errors: formatErrors(err),
+          errors: formatErrors(err, models),
         };
       }
     }),

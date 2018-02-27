@@ -10,11 +10,9 @@ export default {
           channel,
         };
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.log(err);
         return {
           ok: false,
-          errors: formatErrors(err),
+          errors: formatErrors(err, models),
         };
       }
     },
