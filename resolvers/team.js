@@ -24,6 +24,7 @@ export default {
     //   )),
   },
   Mutation: {
+    // eslint-disable-next-line max-len
     addTeamMember: requiresAuth.createResolver(async (parent, { email, teamId }, { models, user }) => {
       try {
         const teamPromise = models.Team.findOne({ where: { id: teamId } }, { raw: true });
@@ -46,6 +47,7 @@ export default {
           ok: true,
         };
       } catch (err) {
+        // eslint-disable-next-line no-console
         console.log(err);
         return {
           ok: false,
@@ -65,6 +67,7 @@ export default {
           team: response,
         };
       } catch (err) {
+        // eslint-disable-next-line no-console
         console.log(err);
         return {
           ok: false,
