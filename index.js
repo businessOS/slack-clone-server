@@ -30,7 +30,7 @@ const schema = makeExecutableSchema({
 
 const app = express();
 
-app.use(cors('192.168.1.6'));
+app.use(cors('*'));
 
 const server = createServer(app);
 
@@ -72,7 +72,7 @@ app.use(
   })),
 );
 
-app.use('/graphiql', graphiqlExpress({ endpointURL: graphqlEndpoint }));
+app.use('/graphiql', graphiqlExpress({ endpointURL: graphqlEndpoint, subscriptionsEndpoint: 'ws://localhost:8081/subscriptions' }));
 
 models.sequelize.sync({}).then(() => {
   server.listen(8081, () => {
@@ -81,6 +81,27 @@ models.sequelize.sync({}).then(() => {
       execute,
       subscribe,
       schema,
+      onConnect: async ({ token, refreshToken }, webSocket) => {
+        if (token && refreshToken) {
+          let user = null;
+          try {
+            const payload = jwt.verify(token, SECRET);
+            user = payload.user;
+          } catch (err) {
+            const newTokens = await refreshTokens(token, refreshToken, models, SECRET, SECRET2);
+            user = newTokens.user;
+          }
+          if (!user) {
+            throw new Error('Autorizacion invalida!');
+          }
+          const member = models.Member.findOne({ where: { teamId: 1, userId: user.id } });
+          if (!member) {
+            throw new Error('Autorizacion no establecida!');
+          }
+          return true;
+        }
+        throw new Error('Autorizacion no establecida!');
+      },
     }, {
       server,
       path: '/subscriptions',
