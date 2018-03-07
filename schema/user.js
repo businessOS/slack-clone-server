@@ -9,10 +9,10 @@ export default `
     id: Int!
     username: String!
     email: String!
-    teams: [Team!]
+    teams: [Team!]!
   }
   type Query {
-    getUser(id: Int!): User!
+    me: User!
     allUsers: [User!]!
   }
   type RegisterResponse {
@@ -21,7 +21,7 @@ export default `
     errors: [Error!]
   }
   type LoginResponse {
-    ok : Boolean!
+    ok: Boolean!
     token: String
     refreshToken: String
     errors: [Error!]

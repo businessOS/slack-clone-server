@@ -1,18 +1,14 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-
-import { makeExecutableSchema } from 'graphql-tools';
 import { graphqlExpress, graphiqlExpress } from 'apollo-server-express';
+import { makeExecutableSchema } from 'graphql-tools';
+import path from 'path';
 import { fileLoader, mergeTypes, mergeResolvers } from 'merge-graphql-schemas';
-
+import cors from 'cors';
+import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { execute, subscribe } from 'graphql';
 import { SubscriptionServer } from 'subscriptions-transport-ws';
-
-
-import path from 'path';
-import cors from 'cors';
-import jwt from 'jsonwebtoken';
 
 import models from './models';
 import { refreshTokens } from './auth';
@@ -20,7 +16,8 @@ import { refreshTokens } from './auth';
 const SECRET = 'asiodfhoi1hoi23jnl1kejd';
 const SECRET2 = 'asiodfhoi1hoi23jnl1kejasdjlkfasdd';
 
-const typeDefs = mergeTypes(fileLoader(path.join(__dirname, './schemas')));
+const typeDefs = mergeTypes(fileLoader(path.join(__dirname, './schema')));
+
 const resolvers = mergeResolvers(fileLoader(path.join(__dirname, './resolvers')));
 
 const schema = makeExecutableSchema({
@@ -31,8 +28,6 @@ const schema = makeExecutableSchema({
 const app = express();
 
 app.use(cors('*'));
-
-const server = createServer(app);
 
 const addUser = async (req, res, next) => {
   const token = req.headers['x-token'];
@@ -72,39 +67,54 @@ app.use(
   })),
 );
 
-app.use('/graphiql', graphiqlExpress({ endpointURL: graphqlEndpoint, subscriptionsEndpoint: 'ws://localhost:8081/subscriptions' }));
+app.use(
+  '/graphiql',
+  graphiqlExpress({
+    endpointURL: graphqlEndpoint,
+    subscriptionsEndpoint: 'ws://localhost:8081/subscriptions',
+  }),
+);
+
+const server = createServer(app);
 
 models.sequelize.sync({}).then(() => {
   server.listen(8081, () => {
     // eslint-disable-next-line no-new
-    new SubscriptionServer({
-      execute,
-      subscribe,
-      schema,
-      onConnect: async ({ token, refreshToken }, webSocket) => {
-        if (token && refreshToken) {
-          let user = null;
-          try {
-            const payload = jwt.verify(token, SECRET);
-            user = payload.user;
-          } catch (err) {
-            const newTokens = await refreshTokens(token, refreshToken, models, SECRET, SECRET2);
-            user = newTokens.user;
+    new SubscriptionServer(
+      {
+        execute,
+        subscribe,
+        schema,
+        onConnect: async ({ token, refreshToken }, webSocket) => {
+          if (token && refreshToken) {
+            let user = null;
+            try {
+              const payload = jwt.verify(token, SECRET);
+              user = payload.user;
+            } catch (err) {
+              const newTokens = await refreshTokens(token, refreshToken, models, SECRET, SECRET2);
+              user = newTokens.user;
+            }
+            if (!user) {
+              throw new Error('Invalid auth tokens');
+            }
+
+            // const member = await models.Member.findOne({ where: { teamId: 1, userId: user.id } });
+
+            // if (!member) {
+            //   throw new Error('Autorizacion no establecida!');
+            // }
+
+            return true;
           }
-          if (!user) {
-            throw new Error('Autorizacion invalida!');
-          }
-          const member = models.Member.findOne({ where: { teamId: 1, userId: user.id } });
-          if (!member) {
-            throw new Error('Autorizacion no establecida!');
-          }
-          return true;
-        }
-        throw new Error('Autorizacion no establecida!');
+
+          throw new Error('Autorizacion no establecida!');
+        },
       },
-    }, {
-      server,
-      path: '/subscriptions',
-    });
+      {
+        server,
+        path: '/subscriptions',
+      },
+    );
   });
 });

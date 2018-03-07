@@ -2,29 +2,7 @@ import formatErrors from '../formatErrors';
 import requiresAuth from '../permissions';
 
 export default {
-  Query: {
-    allTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
-      models.Team.findAll({ where: { owner: user.id } }, { raw: true })),
-    inviteTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
-      models.sequelize.query('select * from teams join members on id = team_id where user_id = ?', {
-        replacements: [user.id],
-        model: models.Team,
-      })),
-    // inviteTeams: requiresAuth.createResolver(async (parent, args, { models, user }) =>
-    //   models.Team.findAll(
-    //     {
-    //       include: [
-    //         {
-    //           model: models.User,
-    //           where: { id: user.id },
-    //         },
-    //       ],
-    //     },
-    //     { raw: true },
-    //   )),
-  },
   Mutation: {
-    // eslint-disable-next-line max-len
     addTeamMember: requiresAuth.createResolver(async (parent, { email, teamId }, { models, user }) => {
       try {
         const teamPromise = models.Team.findOne({ where: { id: teamId } }, { raw: true });
@@ -33,13 +11,13 @@ export default {
         if (team.owner !== user.id) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'Ud no puede agregar miembros a este equipo' }],
+            errors: [{ path: 'email', message: 'Ud no puede agregar personas' }],
           };
         }
         if (!userToAdd) {
           return {
             ok: false,
-            errors: [{ path: 'email', message: 'No se pudo encontrar usuarios con este email' }],
+            errors: [{ path: 'email', message: 'No se encuentra usuarios con este email' }],
           };
         }
         await models.Member.create({ userId: userToAdd.id, teamId });
@@ -47,7 +25,6 @@ export default {
           ok: true,
         };
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.log(err);
         return {
           ok: false,
@@ -58,8 +35,9 @@ export default {
     createTeam: requiresAuth.createResolver(async (parent, args, { models, user }) => {
       try {
         const response = await models.sequelize.transaction(async () => {
-          const team = await models.Team.create({ ...args, owner: user.id });
+          const team = await models.Team.create({ ...args });
           await models.Channel.create({ name: 'general', public: true, teamId: team.id });
+          await models.Member.create({ teamId: team.id, userId: user.id, admin: true });
           return team;
         });
         return {
@@ -67,7 +45,6 @@ export default {
           team: response,
         };
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.log(err);
         return {
           ok: false,
